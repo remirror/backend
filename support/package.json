@@ -2,8 +2,8 @@
   "name": "support",
   "version": "0.0.0",
   "private": true,
-  "description": "The support directory for remirror/template monorepo",
-  "repository": "https://github.com/remirror/template/tree/HEAD/support",
+  "description": "The support directory for remirror/backend monorepo",
+  "repository": "https://github.com/remirror/backend/tree/HEAD/support",
   "dependencies": {
     "@changesets/pre": "^1.0.5",
     "@changesets/read": "^0.4.6",

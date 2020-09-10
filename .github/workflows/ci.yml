@@ -21,7 +21,7 @@ jobs:
   version:
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.repository == 'remirror/template'
+    if: github.ref == 'refs/heads/main' && github.repository == 'remirror/backend'
     steps:
       - name: checkout code repository
         uses: actions/checkout@v2
@@ -231,7 +231,7 @@ jobs:
     timeout-minutes: 20
     needs: [lint, typecheck, unit_test, build_test, size_check]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.repository == 'remirror/template'
+    if: github.ref == 'refs/heads/main' && github.repository == 'remirror/backend'
 
     steps:
       - name: checkout code repository

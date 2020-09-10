@@ -1,6 +1,6 @@
 # template-package
 
-> A sample package from `remirror/template`
+> A sample package from `remirror/backend`
 
 <br />
 

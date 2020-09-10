@@ -28,7 +28,7 @@ installation [instructions](https://pnpm.js.org/en/installation).
 ```bash
 git clone <<FORKED_REPO_URL>>
 cd template
-git remote add upstream https://github.com/remirror/template
+git remote add upstream https://github.com/remirror/backend
 pnpm install
 
 # Checkout a branch and start working on it
@@ -59,7 +59,7 @@ these files are symlinked to the root directory.
   packages and scoped packages within the `packages/@*/*` folders.
 - `support` - This is the package that provides the configuration files, the website, and many other
   folders. Each directory includes a readme file that explains it's functionality. Take a
-  [look](https://github.com/remirror/template/tree/HEAD/support).
+  [look](https://github.com/remirror/backend/tree/HEAD/support).
 
 ## Documentation
 
@@ -247,5 +247,5 @@ This Code of Conduct is adapted from the [Contributor Covenant], version 1.4, av
 
 [contributor covenant]: http://contributor-covenant.org
 [version]: http://contributor-covenant.org/version/1/4/
-[repo]: https://github.com/remirror/template
+[repo]: https://github.com/remirror/backend
 [husky]: https://github.com/typicode/husky

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  Add your <em>motivational</em> tagline here.
+  <em>Deployments</em> and <em>infrastructure</em> for the <strong>remirror</strong> project.
 </p>
 
 <br />
@@ -13,7 +13,6 @@
 <p align="center">
   <a href="#getting-started"><strong>Getting Started</strong></a> ·
   <a href="#why"><strong>Why?</strong></a> ·
-  <a href="#plans"><strong>Plans</strong></a> ·
   <a href="../docs"><strong>Documentation</strong></a> ·
   <a href="../docs/contributing.md"><strong>Contributing</strong></a>
 </p>
@@ -21,8 +20,8 @@
 <br />
 
 <p align="center">
-  <a href="https://github.com/remirror/template/actions?query=workflow:ci">
-    <img src="https://github.com/remirror/template/workflows/ci/badge.svg?branch=main" alt="Continuous integration badge for github actions" title="CI Badge" />
+  <a href="https://github.com/remirror/backend/actions?query=workflow:ci">
+    <img src="https://github.com/remirror/backend/workflows/ci/badge.svg?branch=main" alt="Continuous integration badge for github actions" title="CI Badge" />
   </a>
 </p>
 
@@ -30,40 +29,13 @@
 
 ## Getting Started
 
-Use the following steps when first using this template.
-
-- Find and replace `remirror/template` with `user/repo` across the whole project.
-- Replace `<< TEMPLATE NAME >>` in the `LICENSE` file with the name of your choosing.
-- Replace the template package in the packages folder with a package of your choosing.
-- **_OPTIONAL_**: For automatic publishing add your npm token to to your [github repo secrets](https://docs.github.com/en/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets) with the name `NPM_TOKEN`.
+More to come.
 
 <br />
 
-## Why
+## Why?
 
-I've created this template primarily for my work with remirror, to prevent from constantly reinventing the wheel when starting a new project. I've often had ideas and then delayed because the pain of starting from scratch is too high. This toolkit hopefully helps to reduce the friction.
-
-This template repo comes with the following tools:
-
-- `pnpm` monorepo.
-- `preconstruct` - Automated builds and great support for JS tooling.
-- `TypeScript`
-- `eslint`
-- `prettier`
-- `babel` configuration.
-- `vscode` integration with recommended plugins.
-- `codespaces` with a dev container which is ready to use. You can launch this codebase without any need for.
-- `changesets` for automating releases.
-- `GitHub Actions` as the primary CI tool.
-- `husky` for git hooks.
-- `lint-staged` for automated precommit checks.
-- Minimal files at the top level via symlinks to a directory in `support/root`.
-
-## Plans
-
-These aren't currently supported but I might add them in the future.
-
-- [ ] Docusaurus website
+One repo to manage all backend stuff for remirror is the goal.
 
 <br />
 
@@ -79,7 +51,7 @@ You might also notice there are surprisingly few files in the root directory of 
 
 ## Versioning
 
-This project uses [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/remirror/template/tags).
+This project uses [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/remirror/backend/tags).
 
 <br />
 
