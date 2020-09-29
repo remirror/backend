@@ -1,0 +1,343 @@
+import { exec } from 'child_process';
+import type { Request, Response } from 'express';
+import * as fs from 'fs';
+import sum from 'hash-sum';
+import * as path from 'path';
+import recursive from 'recursive-readdir';
+import * as rimraf from 'rimraf';
+import { parse } from 'url';
+
+interface IFiles {
+  [path: string]: {
+    code: string;
+  };
+}
+
+let typingsFolder: string;
+// Export for testing purposes
+export const packageInstalls: { [name: string]: number } = {};
+export const cleanUpTime = 10 * 60 * 1000; // When 10 minutes old
+
+export function prepareTypingsFolder(folder: string) {
+  typingsFolder = folder;
+  // Delete any old packages due to restart of the process
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(folder)) {
+      fs.mkdirSync(folder);
+    }
+
+    rimraf.default(`${folder}/*`, (err) => {
+      if (err) {
+        console.log('Unable to clean TMP', err);
+        reject();
+      } else {
+        console.log('Clean TMP folder');
+        resolve();
+      }
+    });
+  });
+}
+
+const removeVersion = (depQuery: string) => depQuery.replace(/(?<!^)@.*/, '');
+
+function getDependencyName(path: string) {
+  const dependencyParts = removeVersion(path).split('/');
+  let dependencyName = dependencyParts.shift();
+
+  if (path.startsWith('@')) {
+    dependencyName += `/${dependencyParts.shift()}`;
+  }
+
+  if (dependencyParts[0] && /^\d/.test(dependencyParts[0])) {
+    // Make sure to include the aliased version if it's part of it
+    dependencyName += `/${dependencyParts.shift()}`;
+  }
+
+  return dependencyName || '';
+}
+
+export function getDependencyAndVersion(depString: string) {
+  if (
+    (depString.startsWith('@') && depString.split('@').length === 2) ||
+    depString.split('@').length === 1
+  ) {
+    return { dependency: depString, version: 'latest' };
+  }
+
+  const dependency = getDependencyName(depString);
+  const version = decodeURIComponent(depString.replace(`${dependency}@`, ''));
+
+  return {
+    dependency,
+    version,
+  };
+}
+
+// Directories where we only want .d.ts from
+const TYPE_ONLY_DIRECTORIES = ['src'];
+
+function isFileValid(path: string) {
+  const isTypeOnly = TYPE_ONLY_DIRECTORIES.some((dir) => path.includes(`/${dir}/`));
+  const requiredEnding = isTypeOnly ? '.d.ts' : '.ts';
+
+  if (path.endsWith(requiredEnding)) {
+    return true;
+  }
+
+  if (path.endsWith('package.json')) {
+    return true;
+  }
+
+  return false;
+}
+
+const BLACKLISTED_DIRECTORIES = new Set(['__tests__', 'aws-sdk']);
+
+function readDirectory(location: string): IFiles {
+  const entries = fs.readdirSync(location);
+
+  return entries.reduce((result, entry) => {
+    const fullPath = path.join(location, entry);
+
+    const stat = fs.statSync(fullPath);
+
+    if (stat.isDirectory() && !BLACKLISTED_DIRECTORIES.has(entry)) {
+      return { ...result, ...readDirectory(fullPath) };
+    }
+
+    if (!isFileValid(fullPath)) {
+      return result;
+    }
+
+    const code = fs.readFileSync(fullPath).toString();
+    return { ...result, [fullPath]: { code } };
+  }, {});
+}
+
+/**
+ * This function ensures that we only add package.json files that have typing files included
+ */
+function cleanFiles(files: IFiles, rootPath: string) {
+  const newFiles: IFiles = {};
+  const paths = Object.keys(files);
+  const rootPkgJSON = path.join(rootPath, 'package.json');
+  const validDependencies = new Set(
+    paths.filter((checkedPath) => {
+      if (checkedPath === rootPkgJSON) {
+        return true;
+      }
+
+      if (checkedPath.endsWith('/package.json')) {
+        try {
+          const parsed = JSON.parse(files[checkedPath].code);
+
+          if (parsed.typings || parsed.types) {
+            return true;
+          }
+        } catch {
+          /* ignore */
+        }
+
+        return paths.some((p) => p.startsWith(path.dirname(checkedPath)) && p.endsWith('.ts'));
+      }
+
+      return false;
+    }),
+  );
+
+  paths.forEach((p) => {
+    if (p.endsWith('.ts') || validDependencies.has(p)) {
+      newFiles[p] = files[p];
+    }
+  });
+
+  return newFiles;
+}
+
+export function hasTypes(location: string) {
+  return recursive(location).then((paths) => paths.some((p) => p.endsWith('.d.ts')));
+}
+
+function execPromise(command: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let timeoutId: NodeJS.Timer;
+    const process = exec(command, { maxBuffer: 1024 * 1000 }, (err, res) => {
+      clearTimeout(timeoutId);
+
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      resolve(res);
+    });
+
+    // Max 80s
+    timeoutId = setTimeout(() => {
+      process.kill('SIGINT');
+    }, 80000);
+  });
+}
+
+export async function extractFiles(
+  dependency: string,
+  version: string,
+  dependencyLocation: string,
+): Promise<IFiles> {
+  console.log(`Installing ${dependency}@${version}, id: ${dependencyLocation}`);
+
+  const installQuery = version.startsWith('http') ? version : `${dependency}@${version}`;
+  await execPromise(
+    `cd ${typingsFolder} && mkdir ${dependencyLocation} && cd ${dependencyLocation} && npm init -y && HOME=${typingsFolder}/${dependencyLocation} yarn add  --ignore-engines --no-lockfile --non-interactive --no-progress --prod --cache-folder ./ ${installQuery}`,
+  );
+
+  const dependencyPath = `${typingsFolder}/${dependencyLocation}/node_modules`;
+  const packagePath = `${dependencyPath}/${dependency}`;
+
+  return cleanFiles(readDirectory(dependencyPath), packagePath);
+}
+
+const MAX_RES_SIZE = 5.8 * 1024 * 1024;
+
+function dropFiles(files: IModuleResult) {
+  const result: IModuleResult = {};
+  const index = 0;
+  const paths = Object.keys(files);
+
+  while (JSON.stringify(result).length < MAX_RES_SIZE && index < paths.length) {
+    result[paths[index]] = files[paths[index]];
+  }
+
+  return { files: result, droppedFileCount: index + 1 };
+}
+
+interface IResult {
+  files: {
+    [path: string]: string;
+  };
+  droppedFileCount?: number;
+}
+
+const BLACKLISTED_DEPENDENCIES = new Set(['react-scripts']);
+
+interface IModuleResult {
+  [path: string]: { module: { code: string } };
+}
+
+export async function downloadDependencyTypings(depQuery: string): Promise<IModuleResult> {
+  const { dependency, version = 'latest' } = getDependencyAndVersion(depQuery);
+
+  if (BLACKLISTED_DEPENDENCIES.has(dependency)) {
+    return {};
+  }
+
+  const startTime = Date.now();
+
+  const dependencyLocation = sum(`${dependency}@${version}`) + Math.floor(Math.random() * 100000);
+
+  try {
+    const dependencyPath = `${typingsFolder}/${dependencyLocation}/node_modules`;
+    packageInstalls[dependencyLocation] = Date.now();
+    const files = await extractFiles(dependency, version, dependencyLocation);
+
+    return Object.keys(files).reduce(
+      (t, n) => ({
+        ...t,
+        [n.replace(dependencyPath, '')]: {
+          module: files[n],
+        },
+      }),
+      {},
+    );
+  } catch (error) {
+    error.message = `${dependencyLocation}: ${error.message}`;
+    throw error;
+  } finally {
+    const duration = (Date.now() - startTime) / 1000;
+    console.log(`${dependency}@${version}: done in ${duration}s. Cleaning...`);
+
+    rimraf.default(`${typingsFolder}/${dependencyLocation}`, (err) => {
+      if (err) {
+        console.log(`ERROR - Could not clean up ${dependencyLocation}`);
+      } else {
+        delete packageInstalls[dependencyLocation];
+      }
+    });
+
+    const now = Date.now();
+    Object.keys(packageInstalls).forEach((possiblyOldDependencyLocation) => {
+      if (now - packageInstalls[possiblyOldDependencyLocation] > cleanUpTime) {
+        rimraf.default(`${typingsFolder}/${possiblyOldDependencyLocation}`, (err) => {
+          if (err) {
+            console.log(
+              `ERROR - Could not clean up ${possiblyOldDependencyLocation}, which has been there since ${packageInstalls[possiblyOldDependencyLocation]}`,
+            );
+          } else {
+            delete packageInstalls[possiblyOldDependencyLocation];
+          }
+        });
+      }
+    });
+  }
+}
+
+function dropFilesIfNeeded(filesWithNoPrefix: IModuleResult) {
+  const resultSize = JSON.stringify({
+    status: 'ok',
+    files: filesWithNoPrefix,
+  }).length;
+
+  if (resultSize > MAX_RES_SIZE) {
+    const { files: cleanedFiles, droppedFileCount } = dropFiles(filesWithNoPrefix);
+
+    return {
+      files: cleanedFiles,
+      droppedFileCount,
+    };
+  }
+
+  return {
+    files: filesWithNoPrefix,
+  };
+}
+
+export default async (req: Request, res: Response) => {
+  try {
+    const { query } = parse(req.url, true);
+    const { depQuery } = query;
+
+    if (!depQuery) {
+      throw new Error('Please provide a dependency');
+    }
+
+    if (Array.isArray(depQuery)) {
+      throw new TypeError('Dependency should not be an array');
+    }
+
+    res.setHeader('Content-Type', `application/json`);
+    res.setHeader('Access-Control-Allow-Origin', `*`);
+
+    const files = await downloadDependencyTypings(depQuery);
+    const result = dropFilesIfNeeded(files);
+
+    res.setHeader('Cache-Control', `public, max-age=31536000`);
+    res.end(
+      JSON.stringify({
+        status: 'ok',
+        files: result.files,
+        droppedFileCount: result.droppedFileCount,
+      }),
+    );
+  } catch (error) {
+    console.log('Error', error.message);
+    res.statusCode = 422;
+    res.end(
+      JSON.stringify({
+        status: 'error',
+        files: {},
+        error: error.message,
+        stack: error.stack,
+      }),
+    );
+  }
+};

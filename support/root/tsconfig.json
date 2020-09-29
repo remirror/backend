@@ -17,5 +17,5 @@
       { "name": "typescript-plugin-css-modules" }
     ]
   },
-  "include": ["packages/**/src", "global.d.ts"]
+  "include": ["packages/**/src", "global.d.ts", "apps/**/src"]
 }
